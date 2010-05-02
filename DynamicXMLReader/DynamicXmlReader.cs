@@ -31,7 +31,8 @@ namespace DynamicXMLReader
       return new DynamicXmlReader(XDocument.Load(someUrl));
     }
 
-    public override bool TryInvokeMember(InvokeMemberBinder binder, object[] args, out object result)
+    public override bool TryInvokeMember(
+      InvokeMemberBinder binder, object[] args, out object result)
     {
       if (binder.Name == "Using")
       {
@@ -43,17 +44,32 @@ namespace DynamicXMLReader
       return base.TryInvokeMember(binder, args, out result);
     }
 
+    private static IEnumerable<T> Append<T> (IEnumerable<T> source, T appendedItem)
+    {
+      yield return appendedItem;
+      foreach(var item in source) yield return item;
+    }
+
+    public override bool TryGetIndex(GetIndexBinder binder, object[] indexes, out object result)
+    {
+      result = false;
+      return true;
+      return base.TryGetIndex(binder, indexes, out result);
+    }
 
     public override bool TryGetMember(GetMemberBinder binder, out object result)
     {
       var matchingAttributes =
-        (from attribute in _xElement.Attributes() where attribute.Name.LocalName.ToUpperInvariant() == binder.Name.ToUpperInvariant() select attribute)
-          .ToList();
-      var elements = _xElement.Elements().ToList();
-      elements.Add(_xElement);
+        from attribute in _xElement.Attributes()
+        where
+          attribute.Name.LocalName.ToUpperInvariant()
+          == binder.Name.ToUpperInvariant()
+        select attribute;
+      var elements = Append(_xElement.Elements(), _xElement);
       var matchingElements =
-        (from element in elements where element.Name.LocalName.ToUpperInvariant() == binder.Name.ToUpperInvariant() select element)
-          .ToList();
+        from element in elements
+        where element.Name.LocalName.ToUpperInvariant() == binder.Name.ToUpperInvariant() 
+        select element;
 
       if (TryBindToAttribute(matchingAttributes, out result)) return true;
       if (TryBindToValue(binder, out result)) return true;
@@ -63,14 +79,15 @@ namespace DynamicXMLReader
           return TryBindSingleMatchingElement(matchingElements, out result);
         else
           return TryBindMultipleMatchingElements(matchingElements, out result);
-      if (matchingElements.Count() > 1) return TryBindMultipleMatchingElements(matchingElements, out result);
+      if (matchingElements.Count() > 1) 
+        return TryBindMultipleMatchingElements(matchingElements, out result);
 
       return base.TryGetMember(binder, out result);
     }
 
     private static bool TryBindMultipleMatchingElements(IEnumerable<XElement> matchingElements, out object result)
     {
-      result = ArrayOfDynamicsByContext(matchingElements);
+      result = (dynamic) ArrayOfDynamicsByContext(matchingElements);
       return true;
     }
 
@@ -109,15 +126,15 @@ namespace DynamicXMLReader
       return false;
     }
 
-    private static dynamic[] ArrayOfDynamicsByContext(IEnumerable<XElement> elements)
+    private static IEnumerable<dynamic> ArrayOfDynamicsByContext(IEnumerable<XElement> elements)
     {
       return
         (
           from element in elements
           select
             element.HasElements || element.HasAttributes
-              ? (dynamic)new DynamicXmlReader(element)
-              : (dynamic)element.Value
+              ? (dynamic) new DynamicXmlReader(element)
+              : (dynamic) element.Value
         ).ToArray();
     }
   }
