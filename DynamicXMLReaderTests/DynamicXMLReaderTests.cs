@@ -21,7 +21,7 @@ namespace DynamicXMLReaderTests
     [Test]
     public void ContraVariance()
     {
-      Action<object> someObjectAction = s => Console.WriteLine(s);
+      Action<object> someObjectAction = Console.WriteLine;
       //someObjectAction can be used in place of something that is more specific
       Action<string> someStringAction = someObjectAction;
     }
@@ -122,8 +122,22 @@ namespace DynamicXMLReaderTests
       Assert.AreEqual("The Big Short", dynamicReader[0].Value);
     }
 
+    [Test]
+    public void CanReadUsingIndexer()
+    {
+        const string someXml
+        = "<name first=\"Aaron\" last=\"Erickson\">" +
+            "<age>37</age>" +
+            "<book>The Nomadic Developer</book>" +
+            "<book>Professional F#</book>" +
+          "</name>";
+        var dynamicReader = DynamicXmlReader.Parse(someXml);
+        var result = int.Parse( dynamicReader.Name["Age"] );
 
-    //[Test]
+        Assert.That(result, Is.EqualTo(37));
+    }
+
+      //[Test]
     //public void CanReadTccc8Rss()
     //{
     //  const string someXmlUrl

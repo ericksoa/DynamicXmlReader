@@ -52,46 +52,49 @@ namespace DynamicXMLReader
 
     public override bool TryGetIndex(GetIndexBinder binder, object[] indexes, out object result)
     {
-      result = false;
-      return true;
-      return base.TryGetIndex(binder, indexes, out result);
+        return tryBindMultipleMatchingElements(binder, indexes[0].ToString(), out result) || base.TryGetIndex(binder, indexes, out result);
     }
 
     public override bool TryGetMember(GetMemberBinder binder, out object result)
     {
-      var matchingAttributes =
-        from attribute in _xElement.Attributes()
-        where
-          attribute.Name.LocalName.ToUpperInvariant()
-          == binder.Name.ToUpperInvariant()
-        select attribute;
-      var elements = Append(_xElement.Elements(), _xElement);
-      var matchingElements =
-        from element in elements
-        where element.Name.LocalName.ToUpperInvariant() == binder.Name.ToUpperInvariant() 
-        select element;
-
-      if (TryBindToAttribute(matchingAttributes, out result)) return true;
-      if (TryBindToValue(binder, out result)) return true;
-      
-      if (matchingElements.Count() == 1)
-        if (binder.ReturnType != typeof(IEnumerable<object>))
-          return TryBindSingleMatchingElement(matchingElements, out result);
-        else
-          return TryBindMultipleMatchingElements(matchingElements, out result);
-      if (matchingElements.Count() > 1) 
-        return TryBindMultipleMatchingElements(matchingElements, out result);
-
-      return base.TryGetMember(binder, out result);
+        return tryBindMultipleMatchingElements(binder, binder.Name, out result) || base.TryGetMember(binder, out result);
     }
 
-    private static bool TryBindMultipleMatchingElements(IEnumerable<XElement> matchingElements, out object result)
+    private bool tryBindMultipleMatchingElements(DynamicMetaObjectBinder binder, string name, out object result)
+    {
+        var matchingAttributes =
+            from attribute in _xElement.Attributes()
+            where
+                attribute.Name.LocalName.ToUpperInvariant()
+                == name.ToUpperInvariant()
+            select attribute;
+        var elements = Append(_xElement.Elements(), _xElement);
+        var matchingElements =
+            from element in elements
+            where element.Name.LocalName.ToUpperInvariant() == name.ToUpperInvariant()
+            select element;
+
+        if (tryBindToAttribute(matchingAttributes, out result)) return true;
+        if (tryBindToValue(name, out result)) return true;
+
+        if (matchingElements.Count() == 1)
+            if (binder.ReturnType != typeof(IEnumerable<object>))
+                return tryBindSingleMatchingElement(matchingElements, out result);
+            else
+                return tryBindMultipleMatchingElements(matchingElements, out result);
+        if (matchingElements.Count() > 1)
+            return tryBindMultipleMatchingElements(matchingElements, out result);
+
+        return false;
+    }
+
+    private bool tryBindMultipleMatchingElements(IEnumerable<XElement> matchingElements, out object result)
     {
       result = (dynamic) ArrayOfDynamicsByContext(matchingElements);
       return true;
     }
 
-    private static bool TryBindSingleMatchingElement(IEnumerable<XElement> matchingElements, out object result)
+    private bool tryBindSingleMatchingElement(IEnumerable<XElement> matchingElements, out object result)
     {
       var matchingElement = matchingElements.First();
       if (matchingElement.HasElements || matchingElement.HasAttributes)
@@ -103,7 +106,7 @@ namespace DynamicXMLReader
       return true;
     }
 
-    private static bool TryBindToAttribute(IEnumerable<XAttribute> matchingAttributes, out object result)
+    private bool tryBindToAttribute(IEnumerable<XAttribute> matchingAttributes, out object result)
     {
       if (matchingAttributes.Count() > 0)
       {
@@ -115,15 +118,15 @@ namespace DynamicXMLReader
       return false;
     }
 
-    private bool TryBindToValue(GetMemberBinder binder, out object result)
+    private bool tryBindToValue(string name, out object result)
     {
-      if (binder.Name == "Value")
-      {
-        result = _xElement.Value;
-        return true;
-      }
-      result = null;
-      return false;
+        if (name == "Value")
+        {
+            result = _xElement.Value;
+            return true;
+        }
+        result = null;
+        return false;
     }
 
     private static IEnumerable<dynamic> ArrayOfDynamicsByContext(IEnumerable<XElement> elements)
